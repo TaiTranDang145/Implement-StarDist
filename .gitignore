@@ -1,0 +1,30 @@
+# Folders
+checkpoints/
+runs/
+venv/
+__pycache__/
+.idea/
+.vscode/
+data/
+# Checkpoint files
+*.pt
+*.pth
+
+# Cache files
+*.pyc
+.DS_Store
+
+# Environment
+.env
+.venv
+env/
+ENV/
+
+# Logs
+*.log
+tensorboard/
+
+# Distribution
+dist/
+build/
+*.egg-info/
