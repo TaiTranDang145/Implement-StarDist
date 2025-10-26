@@ -6,6 +6,8 @@ __pycache__/
 .idea/
 .vscode/
 data/
+trained_models/
+
 # Checkpoint files
 *.pt
 *.pth

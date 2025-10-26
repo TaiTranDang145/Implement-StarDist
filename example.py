@@ -1,9 +1,6 @@
-import os
-data_folder = os.path.join('data', 'stage1_train')
-print(data_folder)
-image_ids = next(os.walk((data_folder)))[1][0]
-print(image_ids)
-mask = os.path.join(data_folder, image_ids, 'masks')
-print(mask)
-x = next(os.walk(mask))
-print(x)
+import cv2
+
+path = './data/stage1_train/0b2e702f90aee4fff2bc6e4326308d50cf04701082e718d4f831c8959fbcda93/masks/3235d8c9a0f43a97eeaea47331f62672253eacb740f2c81ac2ab3997256afb4d.png'
+img = cv2.imread(path)
+
+print(img.shape)

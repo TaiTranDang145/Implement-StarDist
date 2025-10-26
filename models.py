@@ -69,7 +69,7 @@ class StarDist(nn.Module):
         self.down1 = EncoderBlock(base_filter, base_filter*2) # [B, 128, 128, 128]
         self.down2 = EncoderBlock(base_filter*2, base_filter*4) # [B, 256, 64, 64]
         self.down3 = EncoderBlock(base_filter*4, base_filter*8) # [B, 512, 32, 32]
-        self.down4 = EncoderBlock(base_filter*8, base_filter*16) # [B, 512, 16, 16]
+        self.down4 = EncoderBlock(base_filter*8, base_filter*16) # [B, 1024, 16, 16]
         # Bottleneck
         #self.bottom = DoubleConv(base_filter*8, base_filter*16) # [B, 1024, 32, 32]
 
@@ -97,7 +97,7 @@ class StarDist(nn.Module):
         x = self.up4(x, x1)
 
         # heads
-        prob = torch.sigmoid(self.prob_head(x))# [B,1,H,W]
+        prob = self.prob_head(x)# [B,1,H,W]
         dist = F.relu(self.dist_head(x))        # [B, n_rays,H,W]
         return prob,dist
 
