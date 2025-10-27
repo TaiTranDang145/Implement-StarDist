@@ -14,7 +14,7 @@ import os
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=str, default='data')
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--img-size', type=int, default=256)
     parser.add_argument('--n-rays', type=int, default=32)
