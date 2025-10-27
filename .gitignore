@@ -1,6 +1,4 @@
 # Folders
-checkpoints/
-runs/
 venv/
 __pycache__/
 .idea/
@@ -24,7 +22,6 @@ ENV/
 
 # Logs
 *.log
-tensorboard/
 
 # Distribution
 dist/
