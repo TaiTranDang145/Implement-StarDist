@@ -99,7 +99,7 @@ def save_visualizations(images, predictions, centers_list, save_dir, num_samples
         plt.close()
 
 
-def save_comparison(images, predictions, ground_truths, centers_list, save_dir, num_samples=10):
+def save_comparison(images, predictions, ground_truths, centers_list, save_dir, num_samples=20):
     os.makedirs(save_dir, exist_ok=True)
     num_samples = min(num_samples, len(images))
 
@@ -128,6 +128,31 @@ def save_comparison(images, predictions, ground_truths, centers_list, save_dir, 
         plt.tight_layout()
         plt.savefig(os.path.join(save_dir, f'comparison_{i:03d}.png'), dpi=150, bbox_inches='tight')
         plt.close()
+def visualize_sample(dataset, idx):
+    sample = dataset.__getitem__(idx)
+    if isinstance(sample, tuple) and len(sample) == 3:
+        image, prob_gt, rays_gt = sample
+        img = image.permute(1, 2, 0).numpy()
+        gt_mask = prob_gt.squeeze().numpy()
+        plt.figure(figsize=(10,5))
+        plt.subplot(1,2,1)
+        plt.imshow(img)
+        plt.title(f"Image index {idx}")
+        plt.axis('off')
+        plt.subplot(1,2,2)
+        plt.imshow(gt_mask, cmap='gray')
+        plt.title("Ground truth mask")
+        plt.axis('off')
+        plt.tight_layout()
+        plt.show()
+    else:
+        image, image_id = sample
+        img = image.permute(1, 2, 0).numpy()
+        plt.imshow(img)
+        plt.title(f"Test image index {idx}")
+        plt.axis('off')
+        plt.show()
+
 
 def main():
     args = get_args()
@@ -153,12 +178,12 @@ def main():
     print(f"Min instances: {np.min(num_instances_per_image)}")
     print(f"Max instances: {np.max(num_instances_per_image)}")
 
-    if args.split in ['train', 'val']:
-        pred_counts, gt_counts = calculate_metrics(predictions, gt_masks)
-        for i in range(len(pred_counts)):
-            print(f"\nGround truth comparison:")
-            print(f"Average predicted instances: {np.mean(pred_counts):.2f}")
-            print(f"Average ground truth regions: {np.mean(gt_counts):.2f}")
+    #if args.split in ['train', 'val']:
+        #pred_counts, gt_counts = calculate_metrics(predictions, gt_masks)
+        # for i in range(len(pred_counts)):
+        #     print(f"\nGround truth comparison:")
+        #     print(f"Average predicted instances: {np.mean(pred_counts):.2f}")
+        #     print(f"Average ground truth regions: {np.mean(gt_counts):.2f}")
 
     save_visualizations(images, predictions, centers_list, os.path.join(args.save_dir, 'visualizations'), args.num_samples)
 
@@ -166,6 +191,7 @@ def main():
         save_comparison(images, predictions, gt_masks, centers_list, args.save_dir, args.num_samples)
     else:
         save_visualizations(images, predictions, centers_list, args.save_dir, args.num_samples)
+    #visualize_sample(dataset, 36)
 
 if __name__ == '__main__':
     main()
