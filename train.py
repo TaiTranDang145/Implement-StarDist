@@ -37,13 +37,11 @@ class StarDistLoss(nn.Module):
         # Probability loss (binary cross entropy)
         prob_loss = self.bce(pred_prob, true_prob)
 
-        with torch.no_grad():
-            weights = true_prob
-
         diff = torch.abs(pred_dist - true_dist)
-        weighted_diff = diff * weights
-        denom = weights.sum() * pred_dist.size(1) + 1e-8
-        dist_loss = weighted_diff.sum() / denom
+        weighted_diff = diff * true_prob
+        numerator = weighted_diff.mean()
+        denominator = true_prob.mean() + 1e-8
+        dist_loss = numerator / denominator
 
         total_loss =  self.w_prob * prob_loss + self.w_dist * dist_loss
         return total_loss, prob_loss, dist_loss
@@ -70,7 +68,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, writ
         train_dist_loss += dist_loss.item()
 
         progressbar.set_description(
-            f'Epoch {epoch + 1} Iter {iter + 1}/{num_iters} Loss: {loss_value:.3f} '
+            f'Epoch {epoch + 1} Iter {iter + 1}/{num_iters}'
+            f'Loss: {loss_value:.4f} Prob: {prob_loss:.4f} Dist: {dist_loss:.4f}'
         )
         step = epoch * num_iters + iter
         writer.add_scalar("Train/Loss", loss_value.item(), step)
@@ -80,6 +79,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, writ
         # backward
         optimizer.zero_grad()
         loss_value.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
     avg_train_loss = train_loss / len(dataloader)
@@ -94,11 +94,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, writ
 
 def validate(model, dataloader, criterion, device, epoch, writer):
     model.eval()
-    val_loss = 0
-    val_prob_loss = 0
-    val_dist_loss = 0
+    val_loss = 0.0
+    val_prob_loss = 0.0
+    val_dist_loss = 0.0
    
-
     progressbar = tqdm(dataloader, colour='blue')
     with torch.no_grad():
         for iter, (images, prob_gt, dist_gt) in enumerate(progressbar):
@@ -116,6 +115,7 @@ def validate(model, dataloader, criterion, device, epoch, writer):
 
             progressbar.set_description(
                 f'Validation Iter {iter + 1}/{len(dataloader)} Loss: {loss:.3f} '
+                f'Loss: {loss:.4f} Prob: {prob_loss:.4f} Dist: {dist_loss:.4f}'
             )
 
 
@@ -136,6 +136,7 @@ def validate(model, dataloader, criterion, device, epoch, writer):
 def main():
     args = get_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
 
     # Dataset & DataLoader
     train_dataset = DSB2018Datasets(
@@ -175,9 +176,15 @@ def main():
     model = StarDist(
         n_channels=3,
         n_rays=args.n_rays,
-        base_filter=args.base_filters,
+        base_filters=args.base_filters,
         shared_channels=args.shared_channels
     ).to(device)
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+
 
     writer = SummaryWriter(log_dir=args.logging)
     criterion = StarDistLoss(w_prob=1.0, w_dist=0.2)
@@ -191,7 +198,7 @@ def main():
         checkpoint = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch'] + 1
+        start_epoch = checkpoint['epoch']
         best_val_loss = checkpoint.get('best_val_loss', best_val_loss)
         if 'scheduler_state_dict' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -210,6 +217,9 @@ def main():
             model, val_loader, criterion, device, epoch, writer
         )
 
+        current_lr = optimizer.param_groups[0]['lr']
+        writer.add_scalar("Learning_Rate", current_lr, epoch)
+        print(f"Learning Rate: {current_lr:.6f}")
 
         # save best model
         last_check_point = {
@@ -227,6 +237,7 @@ def main():
             torch.save(best_ckpt, os.path.join(args.trained_models, 'best_model.pt'))
 
         scheduler.step()
+    writer.close()
 
 if __name__ == '__main__':
     main()
