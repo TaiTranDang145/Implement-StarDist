@@ -52,18 +52,17 @@ class DecoderBlock(nn.Module):
 
 # stardist architecture
 class StarDist(nn.Module):
-    def __init__(self, n_channels = 1, n_rays = 32, base_filters = 64, shared_channels = 128):
+    def __init__(self, n_channels = 1, n_rays = 32, base_filters = 32, shared_channels = 128):
         super().__init__()
         self.n_channels = n_channels
         self.n_rays = n_rays
         # Encoder
         # input [B, n_channels, 256, 256]
-        self.inc = DoubleConv(n_channels, base_filters) # [B, 64, 256, 256]
-        self.down1 = EncoderBlock(base_filters, base_filters*2) # [B, 128, 128, 128]
-        self.down2 = EncoderBlock(base_filters*2, base_filters*4) # [B, 256, 64, 64]
-        self.down3 = EncoderBlock(base_filters*4, base_filters*8) # [B, 512, 32, 32]
-        self.down4 = EncoderBlock(base_filters*8, base_filters*16) # [B, 1024, 16, 16]
-
+        self.inc = DoubleConv(n_channels, base_filters) # [B, 32, 256, 256]
+        self.down1 = EncoderBlock(base_filters, base_filters*2) # [B, 64, 128, 128]
+        self.down2 = EncoderBlock(base_filters*2, base_filters*4) # [B, 128, 64, 64]
+        self.down3 = EncoderBlock(base_filters*4, base_filters*8) # [B, 256, 32, 32]
+        self.down4 = EncoderBlock(base_filters*8, base_filters*16) # [B, 512, 16, 16]
         # Decoder
         self.up1 = DecoderBlock(base_filters*16, base_filters*8) # 512
         self.up2 = DecoderBlock(base_filters*8, base_filters*4) # 256

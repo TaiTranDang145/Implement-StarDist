@@ -203,5 +203,3 @@ if __name__ == "__main__":
     print(f"Unique IDs in mask: {np.unique(instance_mask)}")
 
     print("\n✓ Post-processing test completed!")
-
-

@@ -18,7 +18,7 @@ def get_args():
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--img-size', type=int, default=256)
     parser.add_argument('--n-rays', type=int, default=32)
-    parser.add_argument('--base-filters', type=int, default=64)
+    parser.add_argument('--base-filters', type=int, default=32)
     parser.add_argument('--shared-channels', type=int, default=128)
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--checkpoint', type=str, default=None)
@@ -27,23 +27,35 @@ def get_args():
     return parser.parse_args()
 
 class StarDistLoss(nn.Module):
-    def __init__(self, w_prob=1.0, w_dist=0.2):
+    def __init__(self, w_prob=1.0, w_dist=0.2, background_reg=0.0001):
         super().__init__()
         self.w_prob = w_prob
         self.w_dist = w_dist
+        self.background_reg = background_reg
         self.bce = nn.BCEWithLogitsLoss()
 
     def forward(self, pred_prob, pred_dist, true_prob, true_dist):
         # Probability loss (binary cross entropy)
-        prob_loss = self.bce(pred_prob, true_prob)
+        prob_loss_raw = self.bce(pred_prob, true_prob)
 
+        background_mask = (true_prob < 0.5).float()
+        foreground_mask = (true_prob >= 0.5).float()
+
+        background_penalty = (background_mask * prob_loss_raw).mean()
+        foreground_loss = (foreground_mask * prob_loss_raw).sum() / (foreground_mask.sum() + 1e-8)
+
+        prob_loss = foreground_loss + self.background_reg * background_penalty
+
+        # 2. Distance loss - CHỈ trên foreground (relevant MAE)
+        foreground_mask_dist = (true_prob > 0).float()
         diff = torch.abs(pred_dist - true_dist)
-        weighted_diff = diff * true_prob
-        numerator = weighted_diff.mean()
-        denominator = true_prob.mean() + 1e-8
+        weighted_diff = diff * foreground_mask_dist
+        
+        numerator = weighted_diff.sum()
+        denominator = foreground_mask_dist.sum() + 1e-8
         dist_loss = numerator / denominator
 
-        total_loss =  self.w_prob * prob_loss + self.w_dist * dist_loss
+        total_loss = self.w_prob * prob_loss + self.w_dist * dist_loss
         return total_loss, prob_loss, dist_loss
 
 
@@ -54,7 +66,12 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, writ
     train_dist_loss = 0.0
 
     progressbar = tqdm(dataloader, colour='green')
-    for iter, (images, prob_gt, dist_gt) in enumerate(progressbar):
+    for iter, batch in enumerate(progressbar):
+        if len(batch) == 4:
+            images, prob_gt, dist_gt, _ = batch
+        else:
+            images, prob_gt, dist_gt = batch
+
         images = images.to(device)
         prob_gt = prob_gt.to(device)
         dist_gt = dist_gt.to(device)
@@ -100,7 +117,12 @@ def validate(model, dataloader, criterion, device, epoch, writer):
    
     progressbar = tqdm(dataloader, colour='blue')
     with torch.no_grad():
-        for iter, (images, prob_gt, dist_gt) in enumerate(progressbar):
+        for iter, batch in enumerate(progressbar):
+            if len(batch) == 4:
+                images, prob_gt, dist_gt, _ = batch
+            else:
+                images, prob_gt, dist_gt = batch
+
             images = images.to(device)
             prob_gt = prob_gt.to(device)
             dist_gt = dist_gt.to(device)
@@ -114,7 +136,7 @@ def validate(model, dataloader, criterion, device, epoch, writer):
             val_dist_loss += dist_loss.item()
 
             progressbar.set_description(
-                f'Validation Iter {iter + 1}/{len(dataloader)} Loss: {loss:.3f} '
+                f'Validation Iter {iter + 1}/{len(dataloader)} '
                 f'Loss: {loss:.4f} Prob: {prob_loss:.4f} Dist: {dist_loss:.4f}'
             )
 
@@ -128,7 +150,6 @@ def validate(model, dataloader, criterion, device, epoch, writer):
     writer.add_scalar('Loss/val_prob', avg_prob_loss, epoch)
     writer.add_scalar('Loss/val_dist', avg_dist_loss, epoch)
 
-    
 
     return avg_val_loss, avg_prob_loss, avg_dist_loss
 
@@ -187,9 +208,9 @@ def main():
 
 
     writer = SummaryWriter(log_dir=args.logging)
-    criterion = StarDistLoss(w_prob=1.0, w_dist=0.2)
+    criterion = StarDistLoss(w_prob=1.0, w_dist=0.2, background_reg=0.0001)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10,min_lr=1e-6)
 
     start_epoch = 0
     best_val_loss = np.inf
@@ -217,9 +238,13 @@ def main():
             model, val_loader, criterion, device, epoch, writer
         )
 
+        scheduler.step(val_loss)
+
         current_lr = optimizer.param_groups[0]['lr']
         writer.add_scalar("Learning_Rate", current_lr, epoch)
-        print(f"Learning Rate: {current_lr:.6f}")
+        print(f"Epoch {epoch+1} Summary:")
+        print(f"  Train Loss: {train_loss:.4f} (Prob: {train_prob_loss:.4f}, Dist: {train_dist_loss:.4f})")
+        print(f"  Val Loss:   {val_loss:.4f} (Prob: {val_prob_loss:.4f}, Dist: {val_dist_loss:.4f})")
 
         # save best model
         last_check_point = {
@@ -236,7 +261,6 @@ def main():
             best_ckpt = last_check_point.copy()
             torch.save(best_ckpt, os.path.join(args.trained_models, 'best_model.pt'))
 
-        scheduler.step()
     writer.close()
 
 if __name__ == '__main__':
