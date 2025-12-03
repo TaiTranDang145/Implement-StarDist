@@ -8,3 +8,4 @@ albumentations
 stardist
 scikit-learn
 scikit-image
+tensorboard

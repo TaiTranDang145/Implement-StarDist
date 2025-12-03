@@ -66,7 +66,7 @@ class DSB2018Datasets(Dataset):
             # Distance transform CHO object này
             dist = distance_transform_edt(obj_mask)
             
-            # Normalize bằng MAX của OBJECT NÀY (không phải toàn ảnh)
+            # Normalize bằng MAX của OBJECT NÀY
             dmax = dist.max()
             if dmax > 0:
                 # Mỗi object sẽ có center = 1.0, edge = 0.0
@@ -85,7 +85,6 @@ class DSB2018Datasets(Dataset):
             return prob_map, rays
 
         # star_dist trả về (H, W, n_rays)
-        # mode='cpp' nhanh hơn và chính xác hơn python version
         rays = star_dist(labeled_mask, n_rays=self.n_rays, mode='cpp')
         rays = np.moveaxis(rays, -1, 0).astype(np.float32)  # (n_rays, H, W)
 
@@ -134,7 +133,7 @@ class DSB2018Datasets(Dataset):
             rays = torch.from_numpy(rays)  # (n_rays,H,W)
             labeled_mask = torch.from_numpy(labeled_mask).long()  # (H,W) - THÊM labeled_mask
 
-            return image, prob_map, rays, labeled_mask  # TRẢ VỀ 4 items
+            return image, prob_map, rays, labeled_mask  
 
         else:
             image = image.astype(np.float32) / 255.0
@@ -200,7 +199,6 @@ def visualize_augmentation(dataset, idx=0):
     
     plt.tight_layout()
     plt.savefig('augmentation.png', dpi=150, bbox_inches='tight')
-    print(f"✓ Saved to augmentation.png")
     plt.show()
 
 
@@ -325,23 +323,14 @@ def main():
     print(f"  Image range: [{image.min():.3f}, {image.max():.3f}]")
     print(f"  Prob map range: [{prob_map.min():.3f}, {prob_map.max():.3f}]")
     print(f"  Rays range: [{rays.min():.3f}, {rays.max():.3f}]")
-
-    # Visualizations
-    print("\n" + "="*60)
-    print("Creating visualizations...")
-    print("="*60)
     
     # 1. Visualize dataset sample
-    print("\n1. Visualizing dataset sample (image, prob_map, rays)...")
     visualize_dataset(dataset, idx=0)
     
     # 2. Visualize augmentation
-    print("\n2. Visualizing augmentation (original vs augmented)...")
     visualize_augmentation(dataset, idx=0)
     
-    print("\n" + "="*60)
-    print("✓ All visualizations completed!")
-    print("="*60)
+    
 
 
 if __name__ == '__main__':
