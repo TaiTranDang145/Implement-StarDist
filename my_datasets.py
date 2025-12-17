@@ -31,7 +31,7 @@ class DSB2018Datasets(Dataset):
         else:
             self.image_ids = image_ids
 
-        # data augmentation - QUAN TRỌNG: phải đảm bảo mask dùng nearest interpolation
+        # data augmentation
         if self.augment:
             self.transform = A.Compose([
                 A.Rotate(limit=180, p=0.5, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT),
@@ -43,10 +43,7 @@ class DSB2018Datasets(Dataset):
 
     def compute_prob_map_distance(self, labeled_mask):
         """
-        Tính object probability map theo IMPLEMENTATION GỐC của StarDist:
-        "normalized Euclidean distance to the nearest background pixel"
-        
-        QUAN TRỌNG: Normalize TỪNG CELL về [0, 1] để mọi cell đều có prob max = 1.0
+        normalized Euclidean distance to the nearest background pixel
         """
         prob_map = np.zeros_like(labeled_mask, dtype=np.float32)
         
@@ -206,7 +203,7 @@ def visualize_dataset(dataset, idx=0):
     """
     Visualize one sample from dataset: image, prob_map, and all 32 distance rays
     """
-    image, prob_map, rays = dataset[idx]
+    image, prob_map, rays, label_mask = dataset[idx]
     n_rays = rays.shape[0]  # Should be 32
     
     # Convert to numpy
@@ -297,8 +294,8 @@ def visualize_dataset(dataset, idx=0):
     
     plt.tight_layout()
     plt.savefig('dataset_visualization.png', dpi=150, bbox_inches='tight')
-    print(f"✓ Saved to dataset_visualization.png")
-    print(f"✓ Visualized {n_rays} rays from {len(centers)} cell centers")
+    print(f"Saved to dataset_visualization.png")
+    print(f"Visualized {n_rays} rays from {len(centers)} cell centers")
     plt.show()
 
 
@@ -315,7 +312,7 @@ def main():
     print(f"Dataset size: {len(dataset)}")
     
     # Test one sample
-    image, prob_map, rays = dataset[0]
+    image, prob_map, rays, label_mask = dataset[0]
     print(f"\nSample 0:")
     print(f"  Image shape: {image.shape}")
     print(f"  Prob map shape: {prob_map.shape}")
@@ -325,13 +322,14 @@ def main():
     print(f"  Rays range: [{rays.min():.3f}, {rays.max():.3f}]")
     
     # 1. Visualize dataset sample
-    visualize_dataset(dataset, idx=0)
+    visualize_dataset(dataset, idx=15)
     
     # 2. Visualize augmentation
-    visualize_augmentation(dataset, idx=0)
+    visualize_augmentation(dataset, idx=15)
     
     
 
 
 if __name__ == '__main__':
     main()
+
